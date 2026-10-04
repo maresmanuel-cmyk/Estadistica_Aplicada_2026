@@ -1,0 +1,330 @@
+---
+title: "Ejercicios Propuestos - Distribución Normal"
+subtitle: "Licenciatura en Economía Industrial Manuel Guadalupe Mares Herrera"
+lang: es
+format:
+  html:
+    toc: true
+    code-fold: true
+    df-print: paged
+    theme: cosmo
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(knitr)
+library(kableExtra)
+set.seed(123)
+
+tema <- theme_minimal() +
+  theme(plot.title = element_text(size = 15, face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(size = 13, hjust = 0.5),
+        axis.title = element_text(face = "bold", size = 13))
+```
+
+## Ejercicio 1: Altura de estudiantes
+
+### Análisis de Altura de Estudiantes
+
+Las alturas de estudiantes universitarios siguen una distribución normal con media $\mu = 170 cm$ y desviación estándar $\sigma = 8 cm$.
+
+1.  Simula una muestra de 500 estudiantes
+2.  Calcula la media, mediana y desviación estándar muestral
+3.  ¿Qué porcentaje de estudiantes mide más de 180 cm?
+4.  ¿Cuál es la altura del estudiante en el percentil 25?
+5.  Crea un histograma de la muestra con la densidad teórica superpuesta
+
+```{r altura}
+mu <- 170; sigma <- 8
+
+# 1. Simulación
+alturas <- rnorm(500, mean = mu, sd = sigma)
+
+# 2. Estadísticos muestrales
+cat("Media muestral:   ", round(mean(alturas), 2), "\n")
+cat("Mediana muestral: ", round(median(alturas), 2), "\n")
+cat("Desv. est. muestral:", round(sd(alturas), 2), "\n\n")
+
+# 3. P(X > 180)
+cat("P(X > 180) teórica:", round((1 - pnorm(180, mu, sigma)) * 100, 2), "%\n")
+cat("Observada en la muestra:", round(mean(alturas > 180) * 100, 2), "%\n\n")
+
+# 4. Percentil 25
+cat("Percentil 25 teórico:", round(qnorm(0.25, mu, sigma), 2), "cm\n")
+cat("Percentil 25 muestral:", round(quantile(alturas, 0.25), 2), "cm\n")
+
+# 5. Histograma + densidad teórica
+ggplot(data.frame(x = alturas), aes(x = x)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 30,
+                 fill = "lightblue", color = "black", alpha = 0.7) +
+  stat_function(fun = dnorm, args = list(mean = mu, sd = sigma),
+                color = "red", linewidth = 1.5) +
+  labs(title = "Altura de Estudiantes Universitarios",
+       subtitle = "Histograma de 500 simulaciones vs densidad teórica N(170, 8²)",
+       x = "Altura (cm)", y = "Densidad") +
+  tema
+```
+
+## Ejercicio 2: Control de temperatura industrial
+
+::: {#exr-temperatura}
+### Control de Temperatura Industrial
+
+Un proceso industrial debe mantener la temperatura a 350°C ± 10°C. Las temperaturas siguen $N(350, 5^2)$.
+
+1.  Simular un día de producción (1000 mediciones)
+2.  ¿Qué porcentaje del tiempo la temperatura está fuera de especificación?
+3.  Si el proceso se descentra a $\mu = 355°C$, ¿cómo cambia la calidad?
+4.  ¿Qué $\sigma$ se necesita para tener 99.9% de productos dentro de especificación?
+:::
+
+```{r temperatura}
+mu <- 350; sigma <- 5
+LIE <- 340; LSE <- 360   # 350 ± 10
+
+# 1. Simulación de un día de producción
+temp <- rnorm(1000, mu, sigma)
+
+# 2. % fuera de especificación
+fuera_teo <- (pnorm(LIE, mu, sigma) + (1 - pnorm(LSE, mu, sigma))) * 100
+fuera_obs <- mean(temp < LIE | temp > LSE) * 100
+cat("Fuera de especificación (teórico):  ", round(fuera_teo, 3), "%\n")
+cat("Fuera de especificación (simulado): ", round(fuera_obs, 3), "%\n\n")
+
+# 3. Proceso descentrado: mu = 355
+mu_desc <- 355
+dentro_desc <- pnorm(LSE, mu_desc, sigma) - pnorm(LIE, mu_desc, sigma)
+cat("Dentro de especificación con mu = 355:", round(dentro_desc * 100, 3), "%\n")
+cat("Fuera de especificación con mu = 355: ", round((1 - dentro_desc) * 100, 3), "%\n\n")
+
+# 4. sigma para 99.9% dentro: P(-10 < X - mu < 10) = 0.999
+# 2*Phi(10/sigma) - 1 = 0.999  ->  10/sigma = qnorm(0.9995)
+sigma_req <- 10 / qnorm(0.9995)
+cat("sigma requerida para 99.9% dentro:", round(sigma_req, 4), "°C\n")
+cat("Verificación:", round((pnorm(LSE, mu, sigma_req) - pnorm(LIE, mu, sigma_req)) * 100, 3), "%\n")
+
+# Gráfico comparativo
+x <- seq(325, 385, length.out = 1000)
+df <- data.frame(
+  x = rep(x, 2),
+  y = c(dnorm(x, 350, 5), dnorm(x, 355, 5)),
+  Proceso = rep(c("Centrado (μ = 350)", "Descentrado (μ = 355)"), each = length(x))
+)
+ggplot(df, aes(x, y, color = Proceso)) +
+  geom_line(linewidth = 1.2) +
+  geom_vline(xintercept = c(LIE, LSE), linetype = "dashed", color = "darkgreen", linewidth = 1) +
+  labs(title = "Proceso centrado vs descentrado",
+       subtitle = "Líneas verdes: límites de especificación (340 y 360 °C)",
+       x = "Temperatura (°C)", y = "Densidad") +
+  tema
+```
+
+## Ejercicio 3: Ventas mensuales
+
+::: {#exr-ventas}
+### Análisis de Ventas Mensuales
+
+Las ventas mensuales de una tienda siguen $N(50000, 12000^2)$ pesos.
+
+**Tareas**:
+
+1.  Simula las ventas de 24 meses
+2.  ¿Cuál es la probabilidad de tener ventas superiores a 60,000 pesos?
+3.  ¿En cuántos meses se espera tener ventas por debajo de 30,000 pesos?
+4.  Calcula el rango intercuartílico de las ventas
+5.  Si la meta es superar 45,000 pesos, ¿qué porcentaje de meses se cumple?
+:::
+
+```{r ventas}
+mu <- 50000; sigma <- 12000
+
+# 1. Simulación de 24 meses
+ventas <- rnorm(24, mu, sigma)
+data.frame(Mes = 1:24, Ventas = round(ventas, 2)) %>%
+  kable(caption = "Ventas simuladas (24 meses)", format.args = list(big.mark = ",")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+
+# 2. P(ventas > 60,000)
+cat("P(X > 60,000) =", round(1 - pnorm(60000, mu, sigma), 4), "\n")
+
+# 3. Meses esperados con ventas < 30,000
+p_menor30 <- pnorm(30000, mu, sigma)
+cat("P(X < 30,000) =", round(p_menor30, 4), "\n")
+cat("Meses esperados (de 24):", round(24 * p_menor30, 2), "\n")
+cat("Meses observados en la simulación:", sum(ventas < 30000), "\n")
+
+# 4. Rango intercuartílico
+q1 <- qnorm(0.25, mu, sigma); q3 <- qnorm(0.75, mu, sigma)
+cat("Q1 =", round(q1, 2), "| Q3 =", round(q3, 2), "| RIC =", round(q3 - q1, 2), "\n")
+cat("RIC muestral:", round(IQR(ventas), 2), "\n")
+
+# 5. % de meses que supera 45,000
+cat("P(X > 45,000) =", round((1 - pnorm(45000, mu, sigma)) * 100, 2), "%\n")
+```
+
+## Ejercicio 4: Vida útil de baterías
+
+::: {#exr-baterias}
+### Tiempo de Vida de Baterías
+
+La duración de baterías sigue $N(1200, 150^2)$ horas.
+
+1.  Simula la vida útil de 800 baterías
+2.  ¿Qué garantía (en horas) cubre al 95% de las baterías?
+3.  Si se venden 10,000 baterías con garantía de 900 horas, ¿cuántas se espera que fallen?
+4.  Compara la media y mediana de tu simulación con los valores teóricos
+5.  ¿Cuál es el percentil 10 de la distribución?
+:::
+
+```{r baterias}
+mu <- 1200; sigma <- 150
+
+# 1. Simulación de 800 baterías
+vida <- rnorm(800, mu, sigma)
+
+# 2. Garantía que cubre al 95% (el 95% dura al menos g -> percentil 5)
+garantia <- qnorm(0.05, mu, sigma)
+cat("Garantía para cubrir al 95%:", round(garantia, 1), "horas\n\n")
+
+# 3. 10,000 baterías con garantía de 900 h
+p_falla <- pnorm(900, mu, sigma)
+cat("P(X < 900) =", format(p_falla, digits = 4), "\n")
+cat("Baterías que se espera que fallen:", round(10000 * p_falla, 1), "\n\n")
+
+# 4. Media y mediana: simulación vs teoría
+data.frame(
+  Estadístico = c("Media", "Mediana"),
+  Simulación = round(c(mean(vida), median(vida)), 2),
+  Teórico = c(mu, mu)
+) %>% kable(caption = "Simulación vs valores teóricos") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+
+# 5. Percentil 10
+cat("Percentil 10 teórico: ", round(qnorm(0.10, mu, sigma), 2), "horas\n")
+cat("Percentil 10 muestral:", round(quantile(vida, 0.10), 2), "horas\n")
+
+ggplot(data.frame(x = vida), aes(x)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 40,
+                 fill = "lightgreen", color = "black", alpha = 0.7) +
+  stat_function(fun = dnorm, args = list(mean = mu, sd = sigma),
+                color = "darkgreen", linewidth = 1.5) +
+  geom_vline(xintercept = garantia, color = "red", linetype = "dashed", linewidth = 1) +
+  labs(title = "Vida útil de baterías",
+       subtitle = "Línea roja: garantía que cubre al 95%",
+       x = "Horas", y = "Densidad") +
+  tema
+```
+
+## Ejercicio 5: Errores de medición
+
+### Análisis de Errores de Medición
+
+Los errores de un instrumento de medición siguen $N(0, 2.5^5)$ unidades.
+
+1.  Simula 1000 mediciones
+2.  ¿Qué porcentaje de errores está entre -5 y +5 unidades?
+3.  Calcula la probabilidad de que un error sea mayor a 6 unidades en valor absoluto
+4.  Si se considera "preciso" un error ≤ 3 unidades, ¿qué porcentaje de mediciones son precisas?
+5.  Verifica que la distribución es simétrica alrededor de 0
+
+::: callout-note
+El enunciado dice $N(0, 2.5^5)$; se interpreta como un typo de $N(0, 2.5^2)$, es decir, $\sigma = 2.5$.
+:::
+
+```{r errores}
+mu <- 0; sigma <- 2.5
+
+# 1. Simulación de 1000 mediciones
+err <- rnorm(1000, mu, sigma)
+
+# 2. % de errores entre -5 y +5
+cat("P(-5 < E < 5) teórica:", round((pnorm(5, mu, sigma) - pnorm(-5, mu, sigma)) * 100, 2), "%\n")
+cat("Observada:", round(mean(err > -5 & err < 5) * 100, 2), "%\n\n")
+
+# 3. P(|E| > 6)
+p_abs6 <- 2 * (1 - pnorm(6, mu, sigma))
+cat("P(|E| > 6) teórica:", round(p_abs6, 4), "\n")
+cat("Observada:", round(mean(abs(err) > 6), 4), "\n\n")
+
+# 4. Mediciones precisas (|E| <= 3)
+cat("Precisas (|E| <= 3) teórico:", round((pnorm(3, mu, sigma) - pnorm(-3, mu, sigma)) * 100, 2), "%\n")
+cat("Observado:", round(mean(abs(err) <= 3) * 100, 2), "%\n\n")
+
+# 5. Simetría alrededor de 0
+cat("Media muestral:", round(mean(err), 4), "| Mediana:", round(median(err), 4), "\n")
+cat("Asimetría muestral:", round(mean(((err - mean(err)) / sd(err))^3), 4), "(≈ 0)\n")
+z <- c(0.5, 1, 2, 3, 5)
+cat("F(-x) + F(x) = 1 ?", all(abs(pnorm(-z, mu, sigma) + pnorm(z, mu, sigma) - 1) < 1e-12), "\n")
+cat("f(-x) = f(x) ?  ", all(abs(dnorm(-z, mu, sigma) - dnorm(z, mu, sigma)) < 1e-12), "\n")
+
+ggplot(data.frame(x = err), aes(x)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 40,
+                 fill = "lightblue", color = "black", alpha = 0.7) +
+  stat_function(fun = dnorm, args = list(mean = mu, sd = sigma),
+                color = "red", linewidth = 1.5) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  labs(title = "Errores de medición", subtitle = "Simetría alrededor de 0",
+       x = "Error", y = "Densidad") +
+  tema
+```
+
+## Ejercicio 6: Comparación de dos grupos
+
+::: {#exr-examen_corporativo}
+### Puntuaciones de Examen Comparativo
+
+Dos grupos toman el mismo examen. Grupo A: $N(75, 10^2)$, Grupo B: $N(82, 8^2)$.
+
+1.  Simula 200 estudiantes de cada grupo
+2.  ¿Qué porcentaje de estudiantes del Grupo A supera la media del Grupo B?
+3.  ¿Cuál es la probabilidad de que un estudiante del Grupo B tenga puntuación menor a 70?
+4.  Compara las distribuciones visualmente
+5.  ¿A partir de qué puntuación está el 10% superior de cada grupo?
+:::
+
+```{r examen}
+mu_A <- 75; sd_A <- 10
+mu_B <- 82; sd_B <- 8
+
+# 1. Simulación de 200 estudiantes por grupo
+A <- rnorm(200, mu_A, sd_A)
+B <- rnorm(200, mu_B, sd_B)
+
+# 2. % del Grupo A que supera la media del Grupo B
+cat("Grupo A > 82 (teórico):", round((1 - pnorm(mu_B, mu_A, sd_A)) * 100, 2), "%\n")
+cat("Grupo A > 82 (simulado):", round(mean(A > mu_B) * 100, 2), "%\n\n")
+
+# 3. P(B < 70)
+cat("P(B < 70) =", round(pnorm(70, mu_B, sd_B), 4), "\n\n")
+
+# 5. Punto de corte del 10% superior (percentil 90)
+corte_A <- qnorm(0.90, mu_A, sd_A)
+corte_B <- qnorm(0.90, mu_B, sd_B)
+cat("10% superior Grupo A desde:", round(corte_A, 2), "\n")
+cat("10% superior Grupo B desde:", round(corte_B, 2), "\n")
+
+# 4. Comparación visual
+df <- data.frame(puntaje = c(A, B), Grupo = rep(c("A", "B"), each = 200))
+
+ggplot(df, aes(puntaje, fill = Grupo)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 25,
+                 alpha = 0.4, position = "identity", color = "white") +
+  stat_function(fun = dnorm, args = list(mean = mu_A, sd = sd_A),
+                color = "red", linewidth = 1.3) +
+  stat_function(fun = dnorm, args = list(mean = mu_B, sd = sd_B),
+                color = "blue", linewidth = 1.3) +
+  geom_vline(xintercept = c(corte_A, corte_B), linetype = "dashed",
+             color = c("red", "blue")) +
+  scale_fill_manual(values = c("A" = "red", "B" = "blue")) +
+  labs(title = "Comparación de puntuaciones: Grupo A vs Grupo B",
+       subtitle = "Líneas punteadas: inicio del 10% superior de cada grupo",
+       x = "Puntuación", y = "Densidad") +
+  tema
+
+ggplot(df, aes(Grupo, puntaje, fill = Grupo)) +
+  geom_boxplot(alpha = 0.6) +
+  scale_fill_manual(values = c("A" = "red", "B" = "blue")) +
+  labs(title = "Boxplot por grupo", x = "Grupo", y = "Puntuación") +
+  tema
+```
